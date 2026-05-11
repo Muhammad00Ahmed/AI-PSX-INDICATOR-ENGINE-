@@ -1,19 +1,12 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "frontend/dist/$1" }
-  ],
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite",
   "env": {
     "VITE_API_URL": "https://ai-psx-indicator-1.onrender.com/api",
     "VITE_WS_URL": "wss://ai-psx-indicator-1.onrender.com"
   }
 }
+
+
