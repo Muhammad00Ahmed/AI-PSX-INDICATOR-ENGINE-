@@ -5,7 +5,7 @@ const normalizeBaseUrl = (value, fallback = '') => {
   return value.trim().replace(/\/+$/, '');
 };
 
-const DEFAULT_BACKEND = normalizeBaseUrl(import.meta.env.VITE_API_URL || '') || (import.meta.env.DEV ? 'http://localhost:3002' : '');
+const DEFAULT_BACKEND = normalizeBaseUrl(import.meta.env.VITE_API_URL || 'https://ai-psx-indicator-1.onrender.com') || (import.meta.env.DEV ? 'http://localhost:3002' : 'https://ai-psx-indicator-1.onrender.com');
 const API_BASE = DEFAULT_BACKEND;
 
 const REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes

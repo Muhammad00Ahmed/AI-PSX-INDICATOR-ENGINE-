@@ -5,9 +5,14 @@ const normalizeBaseUrl = (value, fallback = '') => {
   return value.trim().replace(/\/+$/, '');
 };
 
-const DEFAULT_BACKEND = normalizeBaseUrl(import.meta.env.VITE_API_URL || '') || (import.meta.env.DEV ? 'http://localhost:3002' : '');
+const DEFAULT_BACKEND = normalizeBaseUrl(import.meta.env.VITE_API_URL || 'https://ai-psx-indicator-1.onrender.com') || (import.meta.env.DEV ? 'http://localhost:3002' : 'https://ai-psx-indicator-1.onrender.com');
 const API_BASE = DEFAULT_BACKEND;
 const WS_BASE = normalizeBaseUrl(import.meta.env.VITE_WS_URL || '') || (() => {
+  const backendUrl = DEFAULT_BACKEND ? new URL(DEFAULT_BACKEND) : null;
+  if (backendUrl) {
+    const protocol = backendUrl.protocol === 'https:' ? 'wss' : 'ws';
+    return `${protocol}://${backendUrl.host}`;
+  }
   if (typeof window === 'undefined') return '';
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${protocol}://${window.location.host}`;
