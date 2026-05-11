@@ -1,7 +1,7 @@
 services:
   - type: web
     name: psx-market-engine-backend
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
