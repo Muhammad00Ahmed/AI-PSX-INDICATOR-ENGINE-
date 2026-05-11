@@ -1,9 +1,11 @@
 {
+  "packageManager": "npm@9.2.0",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build"
+    "build": "npm run vercel-build",
+    "vercel-build": "npm --prefix frontend install && npm --prefix frontend run build"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "20.x"
   },
   "dependencies": {
     "render": "^0.1.4",
