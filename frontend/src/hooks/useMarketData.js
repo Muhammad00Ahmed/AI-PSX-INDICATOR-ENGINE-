@@ -1,15 +1,11 @@
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 
-const DEFAULT_BACKEND = 'https://ai-psx-indicator-1.onrender.com';
-const API_BASE = import.meta.env.VITE_API_URL || (
-  window.location.hostname.includes('vercel.app')
-    ? `${DEFAULT_BACKEND}/api`
-    : ''
-);
+const DEFAULT_BACKEND = process.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_API_URL || 'https://ai-psx-indicator-1.onrender.com';
+const API_BASE = DEFAULT_BACKEND;
 const WS_BASE = import.meta.env.VITE_WS_URL || (
-  window.location.hostname.includes('vercel.app')
-    ? 'wss://ai-psx-indicator-1.onrender.com'
-    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}/ws`
+  DEFAULT_BACKEND.includes('onrender.com')
+    ? DEFAULT_BACKEND.replace('https://', 'wss://').replace('http://', 'ws://')
+    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`
 );
 
 // ── Normalization ──────────────────────────────────────────────────────

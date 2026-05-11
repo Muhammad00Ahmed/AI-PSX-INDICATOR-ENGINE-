@@ -13,8 +13,8 @@ const { getOrchestrator } = require('./scraper/orchestrator');
 const { getCache }        = require('./pipeline/cache');
 const { getWatchdog }     = require('./monitoring/watchdog');
 
-const PORT         = Number(process.env.PORT)  || 3001;
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(',');
+const PORT         = Number(process.env.PORT) || 3002; // Updated port to avoid conflict
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://your-vercel-domain.vercel.app').split(',');
 
 // ── Express App ──────────────────────────────────────────────────────
 
