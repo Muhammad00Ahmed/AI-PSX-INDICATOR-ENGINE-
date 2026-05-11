@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm run build",
+  "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "env": {
-    "VITE_API_URL": "https://ai-psx-indicator-1.onrender.com/api",
+    "VITE_API_URL": "https://ai-psx-indicator-1.onrender.com",
     "VITE_WS_URL": "wss://ai-psx-indicator-1.onrender.com"
   }
 }

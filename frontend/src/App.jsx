@@ -1104,7 +1104,7 @@ export default function App() {
   const [sortField,     setSortField]    = useState('changePercent');
   const [sortDir,       setSortDir]      = useState('desc');
   const [selectedStock, setSelectedStock] = useState(null);
-  const [showKSE100,    setShowKSE100]   = useState(false);
+  const [indexFilter,   setIndexFilter]  = useState('ALL'); // 'ALL', 'KSE-30', 'KSE-100'
   const [portfolio,     setPortfolio]    = useState(() => {
     try { return JSON.parse(localStorage.getItem('psx-portfolio') || '[]'); } catch { return []; }
   });
@@ -1150,7 +1150,14 @@ export default function App() {
 
   const filteredStocks = useMemo(() => {
     let list = market.stocks.filter(s => s.price > 0 && !s.isDebt);
-    if (showKSE100) list = list.filter(s => s.listedIn?.includes('KSE100') || list.length < 100);
+    
+    // Apply index filter
+    if (indexFilter === 'KSE-100') {
+      list = list.filter(s => s.listedIn?.includes('KSE100'));
+    } else if (indexFilter === 'KSE-30') {
+      list = list.filter(s => s.listedIn?.includes('KSE30'));
+    }
+    
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(s => s.symbol.toLowerCase().includes(q) || (s.companyName || '').toLowerCase().includes(q));
@@ -1160,7 +1167,7 @@ export default function App() {
       const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [market.stocks, search, sortField, sortDir, showKSE100]);
+  }, [market.stocks, search, sortField, sortDir, indexFilter]);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -1199,15 +1206,22 @@ export default function App() {
         ))}
         <div className="kse-filter">
           <button
-            className={`kse-btn ${!showKSE100 ? 'kse-btn--active' : ''}`}
-            onClick={() => setShowKSE100(false)}
+            className={`kse-btn ${indexFilter === 'ALL' ? 'kse-btn--active' : ''}`}
+            onClick={() => setIndexFilter('ALL')}
             title="Show all stocks"
           >
             All Stocks
           </button>
           <button
-            className={`kse-btn ${showKSE100 ? 'kse-btn--active' : ''}`}
-            onClick={() => setShowKSE100(true)}
+            className={`kse-btn ${indexFilter === 'KSE-30' ? 'kse-btn--active' : ''}`}
+            onClick={() => setIndexFilter('KSE-30')}
+            title="Show KSE-30 index stocks only"
+          >
+            KSE-30
+          </button>
+          <button
+            className={`kse-btn ${indexFilter === 'KSE-100' ? 'kse-btn--active' : ''}`}
+            onClick={() => setIndexFilter('KSE-100')}
             title="Show KSE-100 index stocks only"
           >
             KSE-100

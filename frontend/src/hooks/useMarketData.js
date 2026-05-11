@@ -1,11 +1,16 @@
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 
-const DEFAULT_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const normalizeBaseUrl = (value, fallback = '') => {
+  if (!value || typeof value !== 'string') return fallback;
+  return value.trim().replace(/\/+$/, '');
+};
+
+const DEFAULT_BACKEND = normalizeBaseUrl(import.meta.env.VITE_API_URL || '') || (import.meta.env.DEV ? 'http://localhost:3002' : '');
 const API_BASE = DEFAULT_BACKEND;
-const WS_BASE = import.meta.env.VITE_WS_URL || (() => {
-  const backendUrl = new URL(DEFAULT_BACKEND);
-  const protocol = backendUrl.protocol === 'https:' ? 'wss' : 'ws';
-  return `${protocol}://${backendUrl.host}`;
+const WS_BASE = normalizeBaseUrl(import.meta.env.VITE_WS_URL || '') || (() => {
+  if (typeof window === 'undefined') return '';
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${protocol}://${window.location.host}`;
 })();
 
 // ── Normalization ──────────────────────────────────────────────────────

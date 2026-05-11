@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const DEFAULT_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const normalizeBaseUrl = (value, fallback = '') => {
+  if (!value || typeof value !== 'string') return fallback;
+  return value.trim().replace(/\/+$/, '');
+};
+
+const DEFAULT_BACKEND = normalizeBaseUrl(import.meta.env.VITE_API_URL || '') || (import.meta.env.DEV ? 'http://localhost:3002' : '');
 const API_BASE = DEFAULT_BACKEND;
 
 const REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes

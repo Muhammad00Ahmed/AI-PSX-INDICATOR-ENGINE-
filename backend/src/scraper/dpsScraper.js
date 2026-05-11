@@ -119,6 +119,12 @@ class DPSScraper extends EventEmitter {
         const changePct     = parseNum(cells.eq(9).attr('data-order') || cells.eq(9).text());
         const volume        = parseInt2(cells.eq(10).attr('data-order') || cells.eq(10).text());
 
+        const listedInText = cells.eq(2).text().trim();
+        const rowListedIn = listedInText.length
+          ? listedInText.split(',').map((value) => String(value).trim()).filter(Boolean)
+          : [];
+        const listedIn = Array.from(new Set([...(meta.listedIn || []), ...rowListedIn]));
+
         const rawTick = {
           symbol,
           companyName: meta.name || symbol,
@@ -138,7 +144,7 @@ class DPSScraper extends EventEmitter {
           isDebt:      meta.isDebt || false,
           isETF:       meta.isETF  || false,
           isGEM:       meta.isGEM  || false,
-          listedIn:    meta.listedIn || [],
+          listedIn,
         };
 
         const validated = validateTick(rawTick, 'dps_api');
