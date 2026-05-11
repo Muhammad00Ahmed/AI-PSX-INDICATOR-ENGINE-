@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const DEFAULT_BACKEND = process.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_API_URL || 'https://ai-psx-indicator-1.onrender.com';
+const DEFAULT_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 const API_BASE = DEFAULT_BACKEND;
 
 const REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes

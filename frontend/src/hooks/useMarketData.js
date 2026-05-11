@@ -1,12 +1,12 @@
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 
-const DEFAULT_BACKEND = process.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_API_URL || 'https://ai-psx-indicator-1.onrender.com';
+const DEFAULT_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 const API_BASE = DEFAULT_BACKEND;
-const WS_BASE = import.meta.env.VITE_WS_URL || (
-  DEFAULT_BACKEND.includes('onrender.com')
-    ? DEFAULT_BACKEND.replace('https://', 'wss://').replace('http://', 'ws://')
-    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`
-);
+const WS_BASE = import.meta.env.VITE_WS_URL || (() => {
+  const backendUrl = new URL(DEFAULT_BACKEND);
+  const protocol = backendUrl.protocol === 'https:' ? 'wss' : 'ws';
+  return `${protocol}://${backendUrl.host}`;
+})();
 
 // ── Normalization ──────────────────────────────────────────────────────
 
