@@ -50,10 +50,7 @@ const EVENT_COLORS = {
 const fmt  = (n, d = 2) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(d) : '—');
 const fmtV = (v) => {
   if (!v || !Number.isFinite(v) || v <= 0) return '—';
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
-  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
-  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
-  return String(v);
+  return Math.round(v).toLocaleString('en-US');
 };
 const fmtI = (n) => n != null && Number.isFinite(n)
   ? n.toLocaleString('en-PK', { maximumFractionDigits: 2 }) : '—';
@@ -113,7 +110,7 @@ function PriceCell({ price }) {
     const t = setTimeout(() => setFlash(''), 600);
     return () => clearTimeout(t);
   }, [price]);
-  return <span className={`price-cell ${flash}`}>₨{fmt(price)}</span>;
+  return <span className={`price-cell ${flash}`}>{fmt(price)}</span>;
 }
 
 function TickerTape({ stocks }) {
@@ -442,7 +439,7 @@ function StockIntelligenceReport({ stock, explanation, events, range }) {
   const hasInstitutions = events?.some(evt => /institution|fund|sovereign|bank|investor|portfolio|holding/i.test(`${evt.title} ${evt.description}`));
   const hasAcquisition = events?.some(evt => /acquir|acquisition|merger|buyout|takeover/i.test(`${evt.title} ${evt.description}`));
   const hasRegulatory = events?.some(evt => /regulator|regulatory|court|investigation|compliance|penalty/i.test(`${evt.title} ${evt.description}`));
-  const marketCap = stock?.marketCap ? `₨${fmtV(stock.marketCap)}` : 'Not available';
+  const marketCap = stock?.marketCap ? `${fmtV(stock.marketCap)}` : 'Not available';
   const actorLabel = hasInstitutions ? 'Institutional investor activity' : 'Market sentiment';
   const volumeLabel = stock?.volume ? `${fmtV(stock.volume)} traded` : 'Volume not available';
   const changeReason = topEvent ? `${topEvent.title} drove the move.` : `The stock ${direction} due to recent market signals.`;
@@ -617,9 +614,9 @@ function StockDetailModal({ stock, onClose, getStock }) {
           </div>
           <div className="modal-pricing">
             {liveStock.changePercent >= 4 && <span className="hot-stock-badge">HOT STOCK</span>}
-            <div className="modal-price">₨{fmt(liveStock.price)}</div>
+            <div className="modal-price">{fmt(liveStock.price)}</div>
             <div className={`modal-change ${up ? 'text-up' : 'text-down'}`}>
-              {up ? '▲' : '▼'} ₨{fmt(Math.abs(liveStock.change))} ({up ? '+' : ''}{fmt(liveStock.changePercent)}%)
+              {up ? '▲' : '▼'} {fmt(Math.abs(liveStock.change))} ({up ? '+' : ''}{fmt(liveStock.changePercent)}%)
             </div>
           </div>
           <button className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
@@ -627,13 +624,13 @@ function StockDetailModal({ stock, onClose, getStock }) {
 
         {/* Stats bar */}
         <div className="modal-statsbar">
-          <div className="mstat"><span>Open</span><b>₨{fmt(liveStock.open)}</b></div>
+          <div className="mstat"><span>Open</span><b>{fmt(liveStock.open)}</b></div>
           <div className="mstat"><div className="mstat-divider"/>  </div>
-          <div className="mstat"><span>High</span><b className="text-up">₨{fmt(liveStock.high)}</b></div>
+          <div className="mstat"><span>High</span><b className="text-up">{fmt(liveStock.high)}</b></div>
           <div className="mstat"><div className="mstat-divider"/>  </div>
-          <div className="mstat"><span>Low</span><b className="text-down">₨{fmt(liveStock.low)}</b></div>
+          <div className="mstat"><span>Low</span><b className="text-down">{fmt(liveStock.low)}</b></div>
           <div className="mstat"><div className="mstat-divider"/>  </div>
-          <div className="mstat"><span>Prev Close</span><b>₨{fmt(liveStock.ldcp)}</b></div>
+          <div className="mstat"><span>Prev Close</span><b>{fmt(liveStock.ldcp)}</b></div>
           <div className="mstat"><div className="mstat-divider"/>  </div>
           <div className="mstat"><span>Volume</span><b>{fmtV(liveStock.volume)}</b></div>
         </div>
@@ -704,23 +701,23 @@ function StockDetailModal({ stock, onClose, getStock }) {
                 <b>{Array.isArray(liveStock.listedIn) && liveStock.listedIn.length ? liveStock.listedIn.join(', ') : '—'}</b>
               </div>
               <div className="detail-card">
-                <span>Current Price</span><b className={up ? 'text-up' : 'text-down'}>₨{fmt(liveStock.price)}</b>
+                <span>Current Price</span><b className={up ? 'text-up' : 'text-down'}>{fmt(liveStock.price)}</b>
               </div>
               <div className="detail-card">
                 <span>Change</span>
                 <b className={up ? 'text-up' : 'text-down'}>{up ? '+' : ''}{fmt(liveStock.changePercent)}%</b>
               </div>
               <div className="detail-card">
-                <span>Day High</span><b className="text-up">₨{fmt(liveStock.high)}</b>
+                <span>Day High</span><b className="text-up">{fmt(liveStock.high)}</b>
               </div>
               <div className="detail-card">
-                <span>Day Low</span><b className="text-down">₨{fmt(liveStock.low)}</b>
+                <span>Day Low</span><b className="text-down">{fmt(liveStock.low)}</b>
               </div>
               <div className="detail-card">
-                <span>Open</span><b>₨{fmt(liveStock.open)}</b>
+                <span>Open</span><b>{fmt(liveStock.open)}</b>
               </div>
               <div className="detail-card">
-                <span>Prev Close</span><b>₨{fmt(liveStock.ldcp)}</b>
+                <span>Prev Close</span><b>{fmt(liveStock.ldcp)}</b>
               </div>
               <div className="detail-card">
                 <span>Volume</span><b>{fmtV(liveStock.volume)}</b>
@@ -890,7 +887,7 @@ function MoverList({ items, label, onClickStock }) {
         return (
           <div key={s.symbol} className="mover-row" onClick={() => onClickStock && onClickStock(s)}>
             <span className="mover-sym">{s.symbol}</span>
-            <span className="mover-price">₨{fmt(s.price)}</span>
+            <span className="mover-price">{fmt(s.price)}</span>
             <span className={`mover-pct ${up ? 'text-up' : 'text-down'}`}>
               {up ? '+' : ''}{fmt(s.changePercent)}%
             </span>
@@ -912,7 +909,7 @@ const StockRow = memo(function StockRow({ stock, onClick, selected, onAddPortfol
         <div className="company-name">{(stock.companyName || '').slice(0, 22)}</div>
       </td>
       <td className="col-price"><PriceCell price={stock.price} /></td>
-      <td className={`col-change ${up ? 'text-up' : 'text-down'}`}>{up ? '▲' : '▼'} {fmt(Math.abs(stock.change))}</td>
+      <td className={`col-change ${up ? 'text-up' : 'text-down'}`}>{up ? '+' : ''}{fmt(stock.change)}</td>
       <td className={`col-pct ${up ? 'text-up' : 'text-down'}`}>{up ? '+' : ''}{fmt(stock.changePercent)}%</td>
       <td className="col-vol">{fmtV(stock.volume)}</td>
       <td className="col-high">{fmt(stock.high)}</td>
@@ -1046,7 +1043,7 @@ function MarketAdvisor({ market, portfolio, onClickStock }) {
                 </span>
               </div>
               <div className="signal-company">{(item.stock.companyName || '').slice(0, 35)}</div>
-              <div className="signal-price">₨{fmt(item.stock.price)} · Vol: {fmtV(item.stock.volume)}</div>
+              <div className="signal-price">{fmt(item.stock.price)} · Vol: {fmtV(item.stock.volume)}</div>
               <div className="signal-detail">{item.detail}</div>
             </div>
           ))}
@@ -1064,22 +1061,22 @@ function MarketAdvisor({ market, portfolio, onClickStock }) {
           <h3 className="advisor-section-title">Portfolio Overview</h3>
           <div className="port-summary">
             <div className="port-metric">
-              <span>Current Value</span><b>₨{fmtI(portfolioMetrics.totalValue)}</b>
+              <span>Current Value</span><b>{fmtI(portfolioMetrics.totalValue)}</b>
             </div>
             <div className="port-metric">
-              <span>Total Cost</span><b>₨{fmtI(portfolioMetrics.totalCost)}</b>
+              <span>Total Cost</span><b>{fmtI(portfolioMetrics.totalCost)}</b>
             </div>
             <div className={`port-metric ${portfolioMetrics.totalPL >= 0 ? 'metric-profit' : 'metric-loss'}`}>
               <span>Unrealized P/L</span>
-              <b>{portfolioMetrics.totalPL >= 0 ? '+' : ''}₨{fmtI(portfolioMetrics.totalPL)} ({fmt(portfolioMetrics.totalPLPct)}%)</b>
+              <b>{portfolioMetrics.totalPL >= 0 ? '+' : ''}{fmtI(portfolioMetrics.totalPL)} ({fmt(portfolioMetrics.totalPLPct)}%)</b>
             </div>
           </div>
           <div className="port-items">
             {portfolioMetrics.items.map(h => (
               <div key={h.symbol} className={`port-item ${h.pl >= 0 ? 'port-profit' : 'port-loss'}`} onClick={() => onClickStock && onClickStock(market.getStock(h.symbol))}>
                 <div className="port-sym">{h.symbol}</div>
-                <div className="port-qty">{h.quantity} @ ₨{fmt(h.buyPrice)}</div>
-                <div className="port-current">₨{fmt(h.currentPrice)}</div>
+                <div className="port-qty">{h.quantity} @ {fmt(h.buyPrice)}</div>
+                <div className="port-current">{fmt(h.currentPrice)}</div>
                 <div className={`port-pl ${h.pl >= 0 ? 'text-up' : 'text-down'}`}>
                   {h.pl >= 0 ? '+' : ''}{fmt(h.plPct)}%
                 </div>
@@ -1200,10 +1197,22 @@ export default function App() {
         {TABS.map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'tab-btn--active' : ''}`} onClick={() => setTab(t)}>{t}</button>
         ))}
-        <label className="kse-filter">
-          <input type="checkbox" checked={showKSE100} onChange={e => setShowKSE100(e.target.checked)} />
-          {' '}KSE-100
-        </label>
+        <div className="kse-filter">
+          <button
+            className={`kse-btn ${!showKSE100 ? 'kse-btn--active' : ''}`}
+            onClick={() => setShowKSE100(false)}
+            title="Show all stocks"
+          >
+            All Stocks
+          </button>
+          <button
+            className={`kse-btn ${showKSE100 ? 'kse-btn--active' : ''}`}
+            onClick={() => setShowKSE100(true)}
+            title="Show KSE-100 index stocks only"
+          >
+            KSE-100
+          </button>
+        </div>
       </nav>
 
       {/* Main content */}
@@ -1222,9 +1231,9 @@ export default function App() {
                   <thead>
                     <tr>
                       <th onClick={() => handleSort('symbol')}>Symbol{sortIcon('symbol')}</th>
-                      <th onClick={() => handleSort('price')}>Price{sortIcon('price')}</th>
+                      <th onClick={() => handleSort('price')}>Current Price{sortIcon('price')}</th>
                       <th onClick={() => handleSort('change')}>Change{sortIcon('change')}</th>
-                      <th onClick={() => handleSort('changePercent')}>%{sortIcon('changePercent')}</th>
+                      <th onClick={() => handleSort('changePercent')}>Change %{sortIcon('changePercent')}</th>
                       <th onClick={() => handleSort('volume')}>Volume{sortIcon('volume')}</th>
                       <th onClick={() => handleSort('high')}>High{sortIcon('high')}</th>
                       <th onClick={() => handleSort('low')}>Low{sortIcon('low')}</th>
@@ -1279,11 +1288,11 @@ export default function App() {
                     const pl = tv - tc;
                     return (
                       <div className="portfolio-stats">
-                        <div className="stat-card"><span className="stat-label">Total Value</span><span className="stat-value">₨{fmtI(tv)}</span></div>
-                        <div className="stat-card"><span className="stat-label">Total Cost</span><span className="stat-value">₨{fmtI(tc)}</span></div>
+                        <div className="stat-card"><span className="stat-label">Total Value</span><span className="stat-value">{fmtI(tv)}</span></div>
+                        <div className="stat-card"><span className="stat-label">Total Cost</span><span className="stat-value">{fmtI(tc)}</span></div>
                         <div className={`stat-card ${pl >= 0 ? 'stat-profit' : 'stat-loss'}`}>
                           <span className="stat-label">Unrealized P/L</span>
-                          <span className="stat-value">{pl >= 0 ? '+' : ''}₨{fmtI(pl)}</span>
+                          <span className="stat-value">{pl >= 0 ? '+' : ''}{fmtI(pl)}</span>
                         </div>
                       </div>
                     );
@@ -1304,12 +1313,12 @@ export default function App() {
                           </div>
                           <div className="item-middle">
                             <div className="item-row"><span>Qty</span><b>{h.quantity}</b></div>
-                            <div className="item-row"><span>Avg Cost</span><b>₨{fmt(h.buyPrice)}</b></div>
-                            <div className="item-row"><span>Current</span><b className={pl >= 0 ? 'text-up' : 'text-down'}>₨{fmt(stock.price)}</b></div>
+                            <div className="item-row"><span>Avg Cost</span><b>{fmt(h.buyPrice)}</b></div>
+                            <div className="item-row"><span>Current</span><b className={pl >= 0 ? 'text-up' : 'text-down'}>{fmt(stock.price)}</b></div>
                           </div>
                           <div className="item-right">
-                            <div className="item-value">₨{fmtI(val)}</div>
-                            <div className={`item-pl ${pl >= 0 ? 'text-up' : 'text-down'}`}>{pl >= 0 ? '+' : ''}₨{fmtI(Math.abs(pl))}</div>
+                            <div className="item-value">{fmtI(val)}</div>
+                            <div className={`item-pl ${pl >= 0 ? 'text-up' : 'text-down'}`}>{pl >= 0 ? '+' : ''}{fmtI(Math.abs(pl))}</div>
                             <div className={`item-pct ${pl >= 0 ? 'text-up' : 'text-down'}`}>{pl >= 0 ? '+' : ''}{fmt(plPct)}%</div>
                           </div>
                           <div className="item-actions" onClick={e => e.stopPropagation()}>
@@ -1347,7 +1356,7 @@ export default function App() {
             <div className="modal-body" style={{ padding: '16px' }}>
               <div className="form-group">
                 <label>Current Price</label>
-                <div className="price-display">₨{fmt(formState.stock.price)}</div>
+                <div className="price-display">{fmt(formState.stock.price)}</div>
               </div>
               <div className="form-row">
                 <div className="form-group">
@@ -1356,7 +1365,7 @@ export default function App() {
                     onChange={e => setFormState(s => ({ ...s, qty: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label>Buy Price (₨) *</label>
+                  <label>Buy Price *</label>
                   <input type="number" min="0.01" step="0.01" className="form-input" value={formState.buyPrice}
                     onChange={e => setFormState(s => ({ ...s, buyPrice: e.target.value }))} />
                 </div>
