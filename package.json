@@ -2,6 +2,9 @@
   "scripts": {
     "build": "cd frontend && npm install && npm run build"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "render": "^0.1.4",
     "render-cli": "^0.3.2"
