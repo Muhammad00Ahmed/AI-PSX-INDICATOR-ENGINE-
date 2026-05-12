@@ -40,6 +40,7 @@ body {
 }
 
 .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+html { scroll-behavior: smooth; }
 
 /* ── Text colors ── */
 .text-up   { color: var(--up);   }
@@ -111,6 +112,26 @@ body {
 /* ── Main Layout ── */
 .main-content { display: flex; flex: 1; overflow: hidden; }
 .panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.research-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  padding: 20px 24px 28px;
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  align-items: start;
+}
+.research-grid::-webkit-scrollbar {
+  width: 10px;
+}
+.research-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.research-grid::-webkit-scrollbar-thumb {
+  background: rgba(100,116,139,0.32);
+  border-radius: 999px;
+}
 
 /* ── Toolbar ── */
 .toolbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); }

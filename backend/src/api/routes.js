@@ -8,6 +8,10 @@ const { getCache }         = require('../pipeline/cache');
 const { getMarketStatus, isMarketOpen } = require('../utils/marketSession');
 const { fetchHistorical, fetchIndexHistory, generateSyntheticCandles, getDateRange } = require('./historicalData');
 const { getEventsInRange, getEventsForSectors, explainPriceMovement, PSX_EVENTS } = require('./psxEvents');
+const { calculateRSI, calculateMACD, calculateSMA, calculateEMA, calculateBollingerBands, calculateVWAP, calculateRSISeries, calculateEMASeries, calculateSMASeries, INDICATOR_EXPLANATIONS } = require('../analysis/technicalIndicators');
+const alertsRoutes = require('./alertsRoutes');
+const portfolioRoutes = require('./portfolioRoutes');
+const sentimentRoutes = require('./sentimentRoutes');
 
 const router = express.Router();
 
@@ -131,6 +135,84 @@ router.get('/events', (req, res) => {
 
 router.get('/events/all', (req, res) => res.json({ events: PSX_EVENTS, count: PSX_EVENTS.length }));
 
+router.get('/earnings/calendar', (req, res) => {
+  const upcoming = [
+    {
+      symbol: 'OGDC',
+      eventType: 'earnings',
+      title: 'Q1 2026 Results',
+      date: '2026-05-20',
+      volatilityExpectation: 'high',
+      description: 'OGDC Q1 earnings announcement expected to move the energy sector.',
+    },
+    {
+      symbol: 'HBL',
+      eventType: 'dividend',
+      title: 'Dividend Ex-date',
+      date: '2026-05-15',
+      dividendPerShare: 5.5,
+      description: 'HBL dividend record date for the next cash distribution.',
+    },
+    {
+      symbol: 'PPL',
+      eventType: 'board',
+      title: 'Board Meeting',
+      date: '2026-06-01',
+      volatilityExpectation: 'medium',
+      description: 'PPL board meeting may include dividend and guidance updates.',
+    },
+    {
+      symbol: 'PSO',
+      eventType: 'earnings',
+      title: 'Quarterly Results',
+      date: '2026-06-10',
+      volatilityExpectation: 'high',
+      description: 'PSO quarterly earnings release and sector commentary.',
+    },
+    {
+      symbol: 'UBL',
+      eventType: 'dividend',
+      title: 'Dividend Payment',
+      date: '2026-05-22',
+      dividendPerShare: 8.0,
+      description: 'UBL dividend payment execution date for confirmed payout.',
+    },
+  ];
+
+  res.json({ events: upcoming, count: upcoming.length, timestamp: Date.now() });
+});
+
+router.get('/compare', (req, res) => {
+  const symbols = (req.query.symbols || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 5);
+  if (!symbols.length) return res.status(400).json({ error: 'Please provide one or more symbols using ?symbols=OGDC,PPL' });
+
+  const state = getState();
+  const stocks = symbols.map(symbol => {
+    const stock = state.getStock(symbol);
+    if (!stock) return null;
+    return {
+      symbol,
+      companyName: stock.companyName || null,
+      price: stock.price || 0,
+      change: stock.change || 0,
+      changePercent: stock.changePercent || 0,
+      volume: stock.volume || 0,
+      marketCap: stock.marketCap || 0,
+      peRatio: stock.peRatio || null,
+      dividend: stock.dividend || null,
+      eps: stock.eps || null,
+      roe: stock.roe || null,
+      debtToEquity: stock.debtToEquity || null,
+      dayRange: { high: stock.high || 0, low: stock.low || 0 },
+      fiftyTwoWeekRange: { high: stock.fiftyTwoWeekHigh || stock.high || 0, low: stock.fiftyTwoWeekLow || stock.low || 0 },
+      source: stock.source || 'live',
+    };
+  }).filter(Boolean);
+
+  if (!stocks.length) return res.status(404).json({ error: 'No valid symbols found for comparison' });
+  res.json({ symbols, stocks, count: stocks.length, timestamp: Date.now() });
+});
+
 router.get('/explain/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   const range  = (req.query.range || '1m').toLowerCase();
@@ -160,5 +242,97 @@ router.get('/ticks/:symbol', (req, res) => {
 });
 
 router.get('/stats', (req, res) => res.json({ ...getState().getStats(), marketStatus: getMarketStatus(), serverTime: new Date().toISOString() }));
+
+// ── TECHNICAL INDICATORS ENDPOINTS ────────────────────────────────────
+
+router.get('/indicators/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol.toUpperCase();
+    const range = (req.query.range || '1m').toLowerCase();
+    
+    const candles = await fetchHistorical(symbol, range);
+    if (!candles || candles.length < 14) {
+      return res.status(400).json({ error: 'Insufficient data for indicators' });
+    }
+    
+    const closes = candles.map(c => c.close);
+    
+    const rsi = calculateRSI(closes);
+    const macd = calculateMACD(closes);
+    const sma20 = calculateSMA(closes, 20);
+    const sma50 = calculateSMA(closes, 50);
+    const ema12 = calculateEMA(closes, 12);
+    const ema26 = calculateEMA(closes, 26);
+    const bb = calculateBollingerBands(closes);
+    const vwap = calculateVWAP(candles);
+    
+    res.json({
+      symbol,
+      range,
+      indicators: {
+        rsi: rsi ? Number(rsi.toFixed(2)) : null,
+        macd,
+        sma: { sma20: sma20 ? Number(sma20.toFixed(2)) : null, sma50: sma50 ? Number(sma50.toFixed(2)) : null },
+        ema: { ema12: ema12 ? Number(ema12.toFixed(2)) : null, ema26: ema26 ? Number(ema26.toFixed(2)) : null },
+        bollingerBands: bb ? { upper: Number(bb.upper.toFixed(2)), middle: Number(bb.middle.toFixed(2)), lower: Number(bb.lower.toFixed(2)) } : null,
+        vwap: vwap ? Number(vwap.toFixed(2)) : null,
+      },
+      current: {
+        price: candles[candles.length - 1]?.close || 0,
+        volume: candles[candles.length - 1]?.volume || 0,
+      },
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    logger.error({ err: err.message, symbol: req.params.symbol }, 'Indicators route error');
+    res.status(500).json({ error: 'Failed to calculate indicators' });
+  }
+});
+
+router.get('/indicators/:symbol/rsi', async (req, res) => {
+  try {
+    const symbol = req.params.symbol.toUpperCase();
+    const period = Math.min(50, Math.max(5, Number(req.query.period) || 14));
+    const range = (req.query.range || '1m').toLowerCase();
+    
+    const candles = await fetchHistorical(symbol, range);
+    if (!candles || candles.length < period + 1) {
+      return res.status(400).json({ error: 'Insufficient data' });
+    }
+    
+    const closes = candles.map(c => c.close);
+    const rsi = calculateRSI(closes, period);
+    const series = calculateRSISeries(closes, period);
+    
+    res.json({
+      symbol,
+      indicator: 'RSI',
+      period,
+      current: rsi ? Number(rsi.toFixed(2)) : null,
+      series: series.map(v => v ? Number(v.toFixed(2)) : null),
+      explanation: INDICATOR_EXPLANATIONS.RSI,
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, 'RSI route error');
+    res.status(500).json({ error: 'Failed to calculate RSI' });
+  }
+});
+
+router.get('/indicators/explanations', (req, res) => {
+  res.json({ indicators: INDICATOR_EXPLANATIONS });
+});
+
+// ── ALERTS ROUTES ────────────────────────────────────────────────────
+
+router.use('', alertsRoutes);
+
+// ── PORTFOLIO ROUTES ──────────────────────────────────────────────────
+
+router.use('', portfolioRoutes);
+
+// ── SENTIMENT & LEARNING ROUTES ────────────────────────────────────
+
+router.use('', sentimentRoutes);
 
 module.exports = router;

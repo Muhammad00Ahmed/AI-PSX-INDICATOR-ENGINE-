@@ -3,6 +3,9 @@ import { useMarketData } from './hooks/useMarketData';
 import { useHistoricalData, useExplanation } from './hooks/useHistoricalData';
 import * as d3 from 'd3';
 import './App.css';
+import FearGreedIndex from './components/FearGreedIndex';
+import EarningsCalendar from './components/EarningsCalendar';
+import StockComparison from './components/StockComparison';
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -18,7 +21,7 @@ const RANGE_OPTIONS = [
   { id: '5y',  label: '5Y',  desc: 'Past 5 years' },
 ];
 
-const TABS = ['Market', 'Gainers/Losers', 'Heatmap', 'Portfolio', 'Advisor'];
+const TABS = ['Market', 'Gainers/Losers', 'Heatmap', 'Portfolio', 'Research', 'Advisor'];
 
 const EVENT_ICONS = {
   monetary_policy: '🏦',
@@ -1111,6 +1114,14 @@ export default function App() {
   const [formState,  setFormState]  = useState(null);
   const [showModal,  setShowModal]  = useState(false);
 
+  useEffect(() => {
+    const researchPanel = document.querySelector('.research-grid');
+    if (researchPanel) {
+      researchPanel.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [tab]);
+
   const openModal = useCallback((stock) => {
     setSelectedStock(stock);
     setShowModal(true);
@@ -1345,6 +1356,14 @@ export default function App() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {tab === 'Research' && (
+            <div className="research-grid">
+              <FearGreedIndex />
+              <EarningsCalendar />
+              <StockComparison />
             </div>
           )}
 
