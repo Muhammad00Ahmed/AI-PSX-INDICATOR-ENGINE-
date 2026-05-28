@@ -522,7 +522,7 @@ router.get('/indicators/explanations', (req, res) => {
 });
 // ── AUTH / DEMO ROUTES ──────────────────────────────────────────────────
 
-router.use('', authRoutes);
+router.use('/auth', authRoutes);
 // ── ALERTS ROUTES ────────────────────────────────────────────────────
 
 router.use('', alertsRoutes);

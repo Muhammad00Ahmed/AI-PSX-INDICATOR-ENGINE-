@@ -6,7 +6,7 @@ const { createSession, destroySession, getSession } = require('../storage/sessio
 
 const router = express.Router();
 
-router.post('/auth/login', (req, res) => {
+router.post('/login', (req, res) => {
   const { username, password } = req.body || {};
   try {
     const user = authenticate(username, password);
@@ -18,7 +18,7 @@ router.post('/auth/login', (req, res) => {
   }
 });
 
-router.get('/auth/me', (req, res) => {
+router.get('/me', (req, res) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
   if (!token) {
@@ -33,7 +33,7 @@ router.get('/auth/me', (req, res) => {
   res.json({ user: session.user, timestamp: Date.now() });
 });
 
-router.post('/auth/logout', (req, res) => {
+router.post('/logout', (req, res) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
   if (token) {
