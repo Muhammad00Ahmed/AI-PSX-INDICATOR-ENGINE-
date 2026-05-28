@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { API_PATH } from '../utils/api';
 import './EarningsCalendar.css';
 
 /**
@@ -20,7 +21,7 @@ function EarningsCalendar() {
   const loadEvents = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/earnings/calendar');
+      const res = await fetch(`${API_PATH}/earnings/calendar`);
       if (!res.ok) throw new Error('Failed to load calendar');
       const data = await res.json();
       const events = Array.isArray(data.events) ? data.events : [];

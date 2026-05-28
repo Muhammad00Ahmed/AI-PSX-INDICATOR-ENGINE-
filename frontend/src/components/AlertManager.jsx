@@ -1,4 +1,5 @@
 import { useState, useEffect, memo, useCallback } from 'react';
+import { API_PATH } from '../utils/api';
 import './AlertManager.css';
 
 /**
@@ -29,7 +30,7 @@ function AlertManager({ userId }) {
 
   const loadAlerts = useCallback(async () => {
     try {
-      const res = await fetch(`/api/alerts/${userId}`);
+      const res = await fetch(`${API_PATH}/alerts/${userId}`);
       const data = await res.json();
       setAlerts(data.alerts || []);
       loadHistory();
@@ -42,7 +43,7 @@ function AlertManager({ userId }) {
 
   const loadHistory = useCallback(async () => {
     try {
-      const res = await fetch(`/api/alerts/${userId}/history?limit=20`);
+      const res = await fetch(`${API_PATH}/alerts/${userId}/history?limit=20`);
       const data = await res.json();
       setHistory(data.history || []);
     } catch (err) {
@@ -52,7 +53,7 @@ function AlertManager({ userId }) {
 
   const loadStats = useCallback(async () => {
     try {
-      const res = await fetch(`/api/alerts/${userId}/stats`);
+      const res = await fetch(`${API_PATH}/alerts/${userId}/stats`);
       const data = await res.json();
       setStats(data);
     } catch (err) {
@@ -67,7 +68,7 @@ function AlertManager({ userId }) {
     }
 
     try {
-      const res = await fetch('/api/alerts', {
+      const res = await fetch(`${API_PATH}/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,7 +94,7 @@ function AlertManager({ userId }) {
     if (!confirm('Delete this alert?')) return;
 
     try {
-      const res = await fetch(`/api/alerts/${userId}/${alertId}`, {
+      const res = await fetch(`${API_PATH}/alerts/${userId}/${alertId}`, {
         method: 'DELETE',
       });
 
@@ -108,7 +109,7 @@ function AlertManager({ userId }) {
 
   const toggleAlert = async (alert) => {
     try {
-      const res = await fetch(`/api/alerts/${userId}/${alert.id}`, {
+      const res = await fetch(`${API_PATH}/alerts/${userId}/${alert.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !alert.enabled }),

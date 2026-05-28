@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, memo, useCallback, lazy, Suspense } from 'react';
 import { useMarketData } from './hooks/useMarketData';
 import { useHistoricalData, useExplanation } from './hooks/useHistoricalData';
+import { buildApiUrl } from './utils/api';
 import './App.css';
 const FearGreedIndex = lazy(() => import('./components/FearGreedIndex'));
 const EarningsCalendar = lazy(() => import('./components/EarningsCalendar'));
@@ -1173,7 +1174,7 @@ export default function App() {
   const validateSession = useCallback(async (token) => {
     if (!token) return clearAuth();
     try {
-      const res = await fetch('/api/auth/me', { headers: authHeaders(token) });
+      const res = await fetch(buildApiUrl('/auth/me'), { headers: authHeaders(token) });
       if (!res.ok) throw new Error('Session invalid');
       const data = await res.json();
       persistAuth(data.user, token);
@@ -1185,7 +1186,7 @@ export default function App() {
   const loadPortfolio = useCallback(async (currentUser, token) => {
     if (!currentUser || !token) return;
     try {
-      const res = await fetch(`/api/portfolio/${encodeURIComponent(currentUser.id)}`, { headers: authHeaders(token) });
+      const res = await fetch(buildApiUrl(`/portfolio/${encodeURIComponent(currentUser.id)}`), { headers: authHeaders(token) });
       if (!res.ok) throw new Error('Unable to load portfolio');
       const data = await res.json();
       setPortfolio(Array.isArray(data.portfolio?.holdings) ? data.portfolio.holdings : []);
@@ -1198,7 +1199,7 @@ export default function App() {
   const loadUserSummary = useCallback(async (currentUser, token) => {
     if (!currentUser || !token) return;
     try {
-      const res = await fetch(`/api/user/${encodeURIComponent(currentUser.id)}/summary`, { headers: authHeaders(token) });
+      const res = await fetch(buildApiUrl(`/user/${encodeURIComponent(currentUser.id)}/summary`), { headers: authHeaders(token) });
       if (!res.ok) throw new Error('Unable to load user summary');
       const data = await res.json();
       setUserSummary(data);
@@ -1270,7 +1271,7 @@ export default function App() {
     if (!qty || !bp || qty <= 0 || bp <= 0) return;
 
     try {
-      const response = await fetch(`/api/portfolio/${encodeURIComponent(user.id)}/holdings`, {
+      const response = await fetch(buildApiUrl(`/portfolio/${encodeURIComponent(user.id)}/holdings`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1302,7 +1303,7 @@ export default function App() {
     try {
       const holding = portfolio.find(h => h.symbol === symbol);
       if (!holding) return;
-      const response = await fetch(`/api/portfolio/${encodeURIComponent(user.id)}/holdings/${encodeURIComponent(holding.id)}`, {
+      const response = await fetch(buildApiUrl(`/portfolio/${encodeURIComponent(user.id)}/holdings/${encodeURIComponent(holding.id)}`), {
         method: 'DELETE',
         headers: authHeaders(authToken),
       });
@@ -1322,7 +1323,7 @@ export default function App() {
     setAuthError(null);
     setAuthLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: loginForm.username.trim(), password: loginForm.password }),
@@ -1347,7 +1348,7 @@ export default function App() {
   const handleLogout = useCallback(async () => {
     if (authToken) {
       try {
-        await fetch('/api/auth/logout', {
+        await fetch(buildApiUrl('/auth/logout'), {
           method: 'POST',
           headers: authHeaders(authToken),
         });

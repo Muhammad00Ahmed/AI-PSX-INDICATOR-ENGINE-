@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-
-const DEFAULT_BACKEND = process.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_API_URL || 'https://ai-psx-indicator-1.onrender.com';
-const API_BASE = DEFAULT_BACKEND;
+import { API_BASE } from './utils/api';
 
 export function useCandleData(symbol, intervalSec = 60, limit = 200) {
   const [candles, setCandles] = useState([]);

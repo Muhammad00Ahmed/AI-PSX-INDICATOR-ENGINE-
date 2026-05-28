@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { API_PATH } from '../utils/api';
 import './FearGreedIndex.css';
 
 /**
@@ -19,7 +20,7 @@ function FearGreedIndex() {
 
   const loadSentiment = async () => {
     try {
-      const res = await fetch('/api/sentiment');
+      const res = await fetch(`${API_PATH}/sentiment`);
       if (!res.ok) throw new Error('Failed to fetch sentiment');
       const data = await res.json();
       setSentiment(data.sentiment);

@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { API_PATH } from '../utils/api';
 import './StockComparison.css';
 
 /**
@@ -26,7 +27,7 @@ function StockComparison() {
   const loadComparison = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/compare?symbols=${symbols.join(',')}`);
+      const res = await fetch(`${API_PATH}/compare?symbols=${symbols.join(',')}`);
       if (!res.ok) throw new Error('Unable to load comparison');
       const data = await res.json();
       const validStocks = Array.isArray(data.stocks) ? data.stocks.filter(Boolean) : [];

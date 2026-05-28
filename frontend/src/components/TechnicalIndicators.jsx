@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { API_PATH } from '../utils/api';
 
 /**
  * Technical Indicators Panel Component
@@ -18,7 +19,7 @@ function TechnicalIndicators({ symbol, range = '1m' }) {
     setLoading(true);
     setError(null);
     
-    fetch(`/api/indicators/${symbol}?range=${range}`)
+    fetch(`${API_PATH}/indicators/${symbol}?range=${range}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) throw new Error(data.error);

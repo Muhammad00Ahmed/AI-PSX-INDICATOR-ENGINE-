@@ -1,4 +1,5 @@
 import { useState, useEffect, memo, useCallback } from 'react';
+import { API_PATH } from '../utils/api';
 import './PortfolioTracker.css';
 
 /**
@@ -30,9 +31,9 @@ function PortfolioTracker({ userId }) {
     setLoading(true);
     try {
       const [portfolioRes, performanceRes, sectorsRes] = await Promise.all([
-        fetch(`/api/portfolio/${userId}`),
-        fetch(`/api/portfolio/${userId}/performance`),
-        fetch(`/api/portfolio/${userId}/sectors`),
+        fetch(`${API_PATH}/portfolio/${userId}`),
+        fetch(`${API_PATH}/portfolio/${userId}/performance`),
+        fetch(`${API_PATH}/portfolio/${userId}/sectors`),
       ]);
 
       const [portfolioData, performanceData, sectorsData] = await Promise.all([
@@ -58,7 +59,7 @@ function PortfolioTracker({ userId }) {
     }
 
     try {
-      const res = await fetch(`/api/portfolio/${userId}/holdings`, {
+      const res = await fetch(`${API_PATH}/portfolio/${userId}/holdings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -79,7 +80,7 @@ function PortfolioTracker({ userId }) {
     if (!confirm('Remove this holding?')) return;
 
     try {
-      const res = await fetch(`/api/portfolio/${userId}/holdings/${holdingId}`, {
+      const res = await fetch(`${API_PATH}/portfolio/${userId}/holdings/${holdingId}`, {
         method: 'DELETE',
       });
 
