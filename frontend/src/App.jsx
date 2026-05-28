@@ -1,11 +1,11 @@
-import { useState, useMemo, useRef, useEffect, memo, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, memo, useCallback, lazy, Suspense } from 'react';
 import { useMarketData } from './hooks/useMarketData';
 import { useHistoricalData, useExplanation } from './hooks/useHistoricalData';
-import * as d3 from 'd3';
 import './App.css';
-import FearGreedIndex from './components/FearGreedIndex';
-import EarningsCalendar from './components/EarningsCalendar';
-import StockComparison from './components/StockComparison';
+const FearGreedIndex = lazy(() => import('./components/FearGreedIndex'));
+const EarningsCalendar = lazy(() => import('./components/EarningsCalendar'));
+const StockComparison = lazy(() => import('./components/StockComparison'));
+const AIPortfolio = lazy(() => import('./components/AIPortfolio'));
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -21,7 +21,29 @@ const RANGE_OPTIONS = [
   { id: '5y',  label: '5Y',  desc: 'Past 5 years' },
 ];
 
-const TABS = ['Market', 'Gainers/Losers', 'Heatmap', 'Portfolio', 'Research', 'Advisor'];
+const TABS = ['Market', 'Gainers/Losers', 'Heatmap', 'Portfolio', 'AI Smart Portfolio', 'Research', 'Advisor'];
+
+const PATH_TO_TAB = {
+  '/': 'Market',
+  '/gainers-losers': 'Gainers/Losers',
+  '/heatmap': 'Heatmap',
+  '/portfolio': 'Portfolio',
+  '/ai-smart-portfolio': 'AI Smart Portfolio',
+  '/research': 'Research',
+  '/advisor': 'Advisor',
+};
+
+const TAB_TO_PATH = Object.fromEntries(Object.entries(PATH_TO_TAB).map(([path, tabName]) => [tabName, path]));
+
+function getTabFromPath(path) {
+  if (!path || typeof path !== 'string') return 'Market';
+  const normalized = path.replace(/\/+$/, '') || '/';
+  return PATH_TO_TAB[normalized] || 'Market';
+}
+
+function getPathFromTab(tabName) {
+  return TAB_TO_PATH[tabName] || '/';
+}
 
 const EVENT_ICONS = {
   monetary_policy: '🏦',
@@ -1102,17 +1124,104 @@ function MarketAdvisor({ market, portfolio, onClickStock }) {
 export default function App() {
   const market = useMarketData();
 
-  const [tab,           setTab]          = useState('Market');
-  const [search,        setSearch]       = useState('');
-  const [sortField,     setSortField]    = useState('changePercent');
-  const [sortDir,       setSortDir]      = useState('desc');
+  const getStoredAuth = () => {
+    if (typeof window === 'undefined') return { user: null, token: null };
+    const token = localStorage.getItem('psx-auth-token');
+    let storedUser = null;
+    try { storedUser = JSON.parse(localStorage.getItem('psx-auth-user') || 'null'); } catch { storedUser = null; }
+    return { user: storedUser, token };
+  };
+
+  const [user, setUser] = useState(() => getStoredAuth().user);
+  const [authToken, setAuthToken] = useState(() => getStoredAuth().token);
+  const [authError, setAuthError] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: 'faizan', password: '' });
+  const [userSummary, setUserSummary] = useState(null);
+  const [tab, setTab] = useState(() => getTabFromPath(typeof window !== 'undefined' ? window.location.pathname : '/'));
+  const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState('changePercent');
+  const [sortDir, setSortDir] = useState('desc');
   const [selectedStock, setSelectedStock] = useState(null);
-  const [indexFilter,   setIndexFilter]  = useState('ALL'); // 'ALL', 'KSE-30', 'KSE-100'
-  const [portfolio,     setPortfolio]    = useState(() => {
-    try { return JSON.parse(localStorage.getItem('psx-portfolio') || '[]'); } catch { return []; }
-  });
-  const [formState,  setFormState]  = useState(null);
-  const [showModal,  setShowModal]  = useState(false);
+  const [indexFilter, setIndexFilter] = useState('ALL'); // 'ALL', 'KSE-30', 'KSE-100'
+  const [portfolio, setPortfolio] = useState([]);
+  const [formState, setFormState] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+
+  const authHeaders = (token) => token ? { Authorization: `Bearer ${token}` } : {};
+
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    setAuthToken(null);
+    setUserSummary(null);
+    setPortfolio([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('psx-auth-token');
+      localStorage.removeItem('psx-auth-user');
+    }
+  }, []);
+
+  const persistAuth = useCallback((userObj, token) => {
+    setUser(userObj);
+    setAuthToken(token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('psx-auth-token', token);
+      localStorage.setItem('psx-auth-user', JSON.stringify(userObj));
+    }
+  }, []);
+
+  const validateSession = useCallback(async (token) => {
+    if (!token) return clearAuth();
+    try {
+      const res = await fetch('/api/auth/me', { headers: authHeaders(token) });
+      if (!res.ok) throw new Error('Session invalid');
+      const data = await res.json();
+      persistAuth(data.user, token);
+    } catch (err) {
+      clearAuth();
+    }
+  }, [clearAuth, persistAuth]);
+
+  const loadPortfolio = useCallback(async (currentUser, token) => {
+    if (!currentUser || !token) return;
+    try {
+      const res = await fetch(`/api/portfolio/${encodeURIComponent(currentUser.id)}`, { headers: authHeaders(token) });
+      if (!res.ok) throw new Error('Unable to load portfolio');
+      const data = await res.json();
+      setPortfolio(Array.isArray(data.portfolio?.holdings) ? data.portfolio.holdings : []);
+    } catch (err) {
+      console.error('Unable to load portfolio', err);
+      setPortfolio([]);
+    }
+  }, []);
+
+  const loadUserSummary = useCallback(async (currentUser, token) => {
+    if (!currentUser || !token) return;
+    try {
+      const res = await fetch(`/api/user/${encodeURIComponent(currentUser.id)}/summary`, { headers: authHeaders(token) });
+      if (!res.ok) throw new Error('Unable to load user summary');
+      const data = await res.json();
+      setUserSummary(data);
+    } catch (err) {
+      console.error('Unable to load user summary', err);
+      setUserSummary(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const { token } = getStoredAuth();
+    if (token) {
+      validateSession(token);
+    } else {
+      clearAuth();
+    }
+  }, [validateSession, clearAuth]);
+
+  useEffect(() => {
+    if (!user || !authToken) return;
+    loadPortfolio(user, authToken);
+    loadUserSummary(user, authToken);
+  }, [user, authToken, loadPortfolio, loadUserSummary]);
 
   useEffect(() => {
     const researchPanel = document.querySelector('.research-grid');
@@ -1121,6 +1230,24 @@ export default function App() {
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [tab]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setTab(getTabFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const navigateTab = useCallback((nextTab) => {
+    setTab(nextTab);
+    if (typeof window !== 'undefined') {
+      const nextPath = getPathFromTab(nextTab);
+      if (window.location.pathname !== nextPath) {
+        window.history.pushState(null, '', nextPath);
+      }
+    }
+  }, []);
 
   const openModal = useCallback((stock) => {
     setSelectedStock(stock);
@@ -1136,37 +1263,115 @@ export default function App() {
     setFormState({ stock, qty: '1', buyPrice: String(stock.price), show: true });
   }, []);
 
-  const submitPortfolio = () => {
-    if (!formState) return;
+  const submitPortfolio = async () => {
+    if (!formState || !user || !authToken) return;
     const qty = parseFloat(formState.qty);
-    const bp  = parseFloat(formState.buyPrice);
+    const bp = parseFloat(formState.buyPrice);
     if (!qty || !bp || qty <= 0 || bp <= 0) return;
-    const holding = { symbol: formState.stock.symbol, quantity: qty, buyPrice: bp, dateAdded: new Date().toISOString() };
-    setPortfolio(prev => {
-      const updated = [...prev.filter(h => h.symbol !== holding.symbol), holding];
-      localStorage.setItem('psx-portfolio', JSON.stringify(updated));
-      return updated;
-    });
-    setFormState(null);
+
+    try {
+      const response = await fetch(`/api/portfolio/${encodeURIComponent(user.id)}/holdings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(authToken),
+        },
+        body: JSON.stringify({
+          symbol: formState.stock.symbol,
+          quantity: qty,
+          buyPrice: bp,
+          sector: formState.stock.sector || '',
+          companyName: formState.stock.companyName || '',
+        }),
+      });
+      if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(errorBody?.error || 'Unable to save holding');
+      }
+      await loadPortfolio(user, authToken);
+      setFormState(null);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Unable to save holding');
+    }
   };
 
-  const removeFromPortfolio = (symbol) => {
+  const removeFromPortfolio = async (symbol) => {
+    if (!user || !authToken) return;
     if (!window.confirm(`Remove ${symbol}?`)) return;
-    setPortfolio(prev => {
-      const updated = prev.filter(h => h.symbol !== symbol);
-      localStorage.setItem('psx-portfolio', JSON.stringify(updated));
-      return updated;
-    });
+    try {
+      const holding = portfolio.find(h => h.symbol === symbol);
+      if (!holding) return;
+      const response = await fetch(`/api/portfolio/${encodeURIComponent(user.id)}/holdings/${encodeURIComponent(holding.id)}`, {
+        method: 'DELETE',
+        headers: authHeaders(authToken),
+      });
+      if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(errorBody?.error || 'Unable to remove holding');
+      }
+      await loadPortfolio(user, authToken);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Unable to remove holding');
+    }
   };
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setAuthError(null);
+    setAuthLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginForm.username.trim(), password: loginForm.password }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.token) {
+        setAuthError(body?.error || 'Invalid credentials');
+        return;
+      }
+      persistAuth(body.user, body.token);
+      setLoginForm({ ...loginForm, password: '' });
+      await loadPortfolio(body.user, body.token);
+      await loadUserSummary(body.user, body.token);
+    } catch (err) {
+      console.error(err);
+      setAuthError('Unable to sign in');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = useCallback(async () => {
+    if (authToken) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: authHeaders(authToken),
+        });
+      } catch (err) {
+        console.error('Logout failed', err);
+      }
+    }
+    clearAuth();
+  }, [authToken, clearAuth]);
 
   const filteredStocks = useMemo(() => {
     let list = market.stocks.filter(s => s.price > 0 && !s.isDebt);
     
     // Apply index filter
     if (indexFilter === 'KSE-100') {
-      list = list.filter(s => s.listedIn?.includes('KSE100'));
+      list = list.filter(s => {
+        const listed = Array.isArray(s.listedIn) ? s.listedIn : [];
+        return listed.includes('KSE100') || listed.includes('KSE-100');
+      });
     } else if (indexFilter === 'KSE-30') {
-      list = list.filter(s => s.listedIn?.includes('KSE30'));
+      list = list.filter(s => {
+        const listed = Array.isArray(s.listedIn) ? s.listedIn : [];
+        return listed.includes('KSE30') || listed.includes('KSE-30');
+      });
     }
     
     if (search.trim()) {
@@ -1186,6 +1391,49 @@ export default function App() {
   };
   const sortIcon = (f) => sortField === f ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
+  if (!user) {
+    return (
+      <div className="app auth-screen">
+        <div className="auth-card">
+          <div className="auth-header">
+            <span className="logo">PSX<span className="logo-pro"> PRO</span></span>
+            <p className="auth-desc">Your portfolio and account data are secured behind a single authorized user. Sign in with the approved credentials to continue.</p>
+          </div>
+          {authError && <div className="auth-error">{authError}</div>}
+          <form className="auth-form" onSubmit={handleLogin}>
+            <div className="auth-field">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                className="auth-input"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm(s => ({ ...s, username: e.target.value }))}
+                placeholder="faizan"
+                autoComplete="username"
+              />
+            </div>
+            <div className="auth-field">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                className="auth-input"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm(s => ({ ...s, password: e.target.value }))}
+                placeholder="Enter password"
+                autoComplete="current-password"
+              />
+            </div>
+            <button type="submit" className="auth-submit" disabled={authLoading}>
+              {authLoading ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
+          <p className="auth-note">Only account allowed: <strong>faizan</strong> / <strong>123</strong></p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       {/* Header */}
@@ -1200,6 +1448,12 @@ export default function App() {
           <IndexCard index={market.kse30}  label="KSE-30" />
         </div>
         <div className="header-right">
+          {user ? (
+            <div className="user-info">
+              <span className="user-label">Signed in as <strong>{user.username}</strong></span>
+              <button className="btn-logout" onClick={handleLogout}>Logout</button>
+            </div>
+          ) : null}
           <span className="header-stats">
             {market.stocks.length} stocks
             {market.lastUpdate ? ` · ${new Date(market.lastUpdate).toLocaleTimeString('en-PK')}` : ''}
@@ -1213,7 +1467,7 @@ export default function App() {
       {/* Tabs */}
       <nav className="tabs">
         {TABS.map(t => (
-          <button key={t} className={`tab-btn ${tab === t ? 'tab-btn--active' : ''}`} onClick={() => setTab(t)}>{t}</button>
+          <button key={t} className={`tab-btn ${tab === t ? 'tab-btn--active' : ''}`} onClick={() => navigateTab(t)}>{t}</button>
         ))}
         <div className="kse-filter">
           <button
@@ -1297,7 +1551,7 @@ export default function App() {
             <div className="portfolio-tab">
               <div className="portfolio-header">
                 <h3 className="section-title">📊 My Portfolio</h3>
-                <button className="btn-add-stock" onClick={() => setTab('Market')}>＋ Add Stock</button>
+                <button className="btn-add-stock" onClick={() => navigateTab('Market')}>＋ Add Stock</button>
               </div>
               {portfolio.length === 0 ? (
                 <div className="portfolio-empty">
@@ -1359,12 +1613,20 @@ export default function App() {
             </div>
           )}
 
+          {tab === 'AI Smart Portfolio' && (
+            <Suspense fallback={<div className="loading-panel">Loading AI portfolio…</div>}>
+              <AIPortfolio market={market} />
+            </Suspense>
+          )}
+
           {tab === 'Research' && (
-            <div className="research-grid">
-              <FearGreedIndex />
-              <EarningsCalendar />
-              <StockComparison />
-            </div>
+            <Suspense fallback={<div className="loading-panel">Loading research widgets…</div>}>
+              <div className="research-grid">
+                <FearGreedIndex />
+                <EarningsCalendar />
+                <StockComparison />
+              </div>
+            </Suspense>
           )}
 
           {tab === 'Advisor' && (

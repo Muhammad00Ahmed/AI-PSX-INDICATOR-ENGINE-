@@ -43,6 +43,23 @@ class PortfolioEngine {
   }
 
   /**
+   * Overwrite a user's portfolio with persisted data.
+   */
+  setPortfolio(userId, portfolio) {
+    if (!portfolio || typeof portfolio !== 'object') {
+      return this.initPortfolio(userId);
+    }
+    const normalized = {
+      userId,
+      holdings: Array.isArray(portfolio.holdings) ? portfolio.holdings : [],
+      createdAt: portfolio.createdAt || new Date().toISOString(),
+      updatedAt: portfolio.updatedAt || new Date().toISOString(),
+    };
+    this.portfolios.set(userId, normalized);
+    return normalized;
+  }
+
+  /**
    * Add a holding to the portfolio
    */
   addHolding(userId, holding) {

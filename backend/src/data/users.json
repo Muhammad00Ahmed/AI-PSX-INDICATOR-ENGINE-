@@ -1,0 +1,13 @@
+{
+  "users": {
+    "faizan": {
+      "id": "faizan",
+      "username": "faizan",
+      "role": "admin",
+      "accountType": "single_user",
+      "passwordHash": "f042948826fb7eb750c18105dd68d4d1$e3c616acdd926cacb4e684653e8770fc9cd36bc44f2a66edee64d44d3513c3aa5480eec2d2f06d63099cbcc6f8af07a11cc631d2ae0688c315ea92d0e7a2294a",
+      "createdAt": "2026-05-28T19:57:21.625Z",
+      "updatedAt": "2026-05-28T19:57:21.625Z"
+    }
+  }
+}

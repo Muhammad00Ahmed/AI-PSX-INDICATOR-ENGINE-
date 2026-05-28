@@ -9,9 +9,12 @@ const { getMarketStatus, isMarketOpen } = require('../utils/marketSession');
 const { fetchHistorical, fetchIndexHistory, generateSyntheticCandles, getDateRange } = require('./historicalData');
 const { getEventsInRange, getEventsForSectors, explainPriceMovement, PSX_EVENTS } = require('./psxEvents');
 const { calculateRSI, calculateMACD, calculateSMA, calculateEMA, calculateBollingerBands, calculateVWAP, calculateRSISeries, calculateEMASeries, calculateSMASeries, INDICATOR_EXPLANATIONS } = require('../analysis/technicalIndicators');
+const { generateInsight } = require('../../analysis/insightGenerator');
 const alertsRoutes = require('./alertsRoutes');
+const authRoutes = require('./authRoutes');
 const portfolioRoutes = require('./portfolioRoutes');
 const sentimentRoutes = require('./sentimentRoutes');
+const userRoutes = require('./userRoutes');
 
 const router = express.Router();
 
@@ -206,6 +209,10 @@ router.get('/compare', (req, res) => {
       dayRange: { high: stock.high || 0, low: stock.low || 0 },
       fiftyTwoWeekRange: { high: stock.fiftyTwoWeekHigh || stock.high || 0, low: stock.fiftyTwoWeekLow || stock.low || 0 },
       source: stock.source || 'live',
+      sector: stock.sector || 'Unknown',
+      volatility: stock.volatility || 0,
+      momentum: stock.momentum || 0,
+      trendScore: stock.trendScore || 0,
     };
   }).filter(Boolean);
 
@@ -213,7 +220,198 @@ router.get('/compare', (req, res) => {
   res.json({ symbols, stocks, count: stocks.length, timestamp: Date.now() });
 });
 
-router.get('/explain/:symbol', async (req, res) => {
+let aiPortfolioCache = { key: '', ts: 0, data: null };
+let aiPortfolioInsightCache = { key: '', ts: 0, data: null };
+
+router.get('/ai-portfolio/samples', (req, res) => {
+  const state = getState();
+  const allStocks = state.getAllStocks().filter(s => s.price > 0);
+  const topStocks = allStocks.sort((a, b) => (b.volume || 0) - (a.volume || 0)).slice(0, 50);
+  const sampleSymbols = topStocks.slice(0, 20).map(s => s.symbol);
+  res.json({ symbols: sampleSymbols, count: sampleSymbols.length, timestamp: Date.now() });
+});
+
+router.post('/ai-portfolio/allocate', (req, res) => {
+  const { amount, count, risk, goal, symbols } = req.body;
+  const totalInvestment = Number(amount) || 0;
+  const portfolioCount = Math.min(20, Math.max(1, Number(count) || 5));
+  const prioritisedSymbols = Array.isArray(symbols)
+    ? symbols.map(String).map(s => s.trim().toUpperCase()).filter(Boolean)
+    : [];
+  const riskPreference = ['conservative','moderate','aggressive'].includes((risk||'').toLowerCase()) ? risk.toLowerCase() : 'moderate';
+  const investmentGoal = ['growth','dividend','balanced','low risk'].includes((goal||'').toLowerCase()) ? goal.toLowerCase() : 'balanced';
+
+  if (totalInvestment <= 0) return res.status(400).json({ error: 'Investment amount must be greater than 0' });
+
+  const cacheKey = JSON.stringify({ amount: totalInvestment, count: portfolioCount, risk: riskPreference, goal: investmentGoal, symbols: prioritisedSymbols.slice().sort() });
+  const cacheAge = Date.now() - aiPortfolioCache.ts;
+  if (cacheAge < 9000 && cacheKey === aiPortfolioCache.key) {
+    return res.json({ ...aiPortfolioCache.data, cached: true, timestamp: Date.now() });
+  }
+
+  const state = getState();
+  let candidates = state.getAllStocks().filter(s => s.price > 0 && s.volume > 0);
+
+  const goalWeights = {
+    growth:  { weight: 1.35, sectorBias: ['Oil & Gas','Technology','Pharma'] },
+    dividend:{ weight: 1.15, sectorBias: ['Banks','Energy','Fertilizers'] },
+    balanced:{ weight: 1.0, sectorBias: ['Banks','Oil & Gas','Cement'] },
+    'low risk':{ weight: 0.85, sectorBias: ['Banks','Fertilizers','Cement'] },
+  };
+
+  const riskScores = {
+    conservative: 0.7,
+    moderate:     1.0,
+    aggressive:   1.3,
+  };
+
+  const riskScale = riskScores[riskPreference];
+  const target = goalWeights[investmentGoal] || goalWeights.balanced;
+
+  const scoredStocks = candidates.map(stock => {
+    const volatility = stock.volatility || Math.max(1, Math.abs(stock.changePercent || 0));
+    const momentum = stock.momentum || ((stock.changePercent || 0) + ((stock.price || 0) / Math.max(1, stock.high || stock.price || 1)) * 10);
+    const dividendYield = stock.dividendYield || ((stock.dividend || 0) / Math.max(1, stock.price || 1));
+    const sectorStrength = ['Banks','Oil & Gas','Fertilizers','Cement'].includes(stock.sector) ? 1.1 : 1.0;
+    const financialStrength = Math.min(1, Math.max(0, ((stock.roe || 0) / 20) + ((stock.peRatio ? 15 / stock.peRatio : 0.5))));
+
+    const baseScore = (
+      (momentum * 0.4) +
+      ((1 / Math.max(1, volatility)) * 0.3) +
+      (dividendYield * 0.15) +
+      (financialStrength * 0.15)
+    ) * sectorStrength;
+
+    const goalBias = target.sectorBias.includes(stock.sector) ? 1.05 : 1.0;
+    const riskBias = riskPreference === 'aggressive' ? (momentum > 0 ? 1.08 : 0.95) : riskPreference === 'conservative' ? (volatility < 5 ? 1.05 : 0.9) : 1.0;
+
+    return {
+      ...stock,
+      score: baseScore * goalBias * riskBias,
+      volatility,
+      dividendYield,
+      financialStrength,
+      momentum,
+    };
+  });
+
+  const symbolSet = new Set(prioritisedSymbols);
+  const sortedCandidates = [...scoredStocks].sort((a, b) => b.score - a.score).slice(0, portfolioCount * 3);
+  const requestedStocks = prioritisedSymbols
+    .map(symbol => scoredStocks.find(stock => stock.symbol === symbol))
+    .filter(Boolean)
+    .map(stock => ({ ...stock, score: stock.score * 1.2 }));
+  const remainingCandidates = sortedCandidates.filter(stock => !symbolSet.has(stock.symbol));
+  const chosen = [...requestedStocks, ...remainingCandidates].slice(0, portfolioCount);
+  const totalScore = chosen.reduce((sum, s) => sum + s.score, 0) || 1;
+
+  const allocations = chosen.map((stock, idx) => {
+    const raw = (stock.score / totalScore) * totalInvestment * (0.9 + 0.2 * ((portfolioCount - idx) / portfolioCount));
+    const price = stock.price || 1;
+    const shares = Math.max(1, Math.floor(raw / price));
+    const allocated = shares * price;
+    return {
+      symbol: stock.symbol,
+      companyName: stock.companyName || '',
+      sector: stock.sector || 'Unknown',
+      price,
+      score: Number(stock.score.toFixed(4)),
+      allocated: Number(allocated.toFixed(2)),
+      shares,
+      targetRatio: Number(((stock.score / totalScore) * 100).toFixed(1)),
+      volatility: Number(stock.volatility.toFixed(2)),
+      dividendYield: Number((stock.dividendYield * 100).toFixed(2)),
+      momentum: Number(stock.momentum.toFixed(2)),
+      financialStrength: Number(stock.financialStrength.toFixed(2)),
+    };
+  });
+
+  const totalAllocated = allocations.reduce((sum, item) => sum + item.allocated, 0);
+  const remainingBalance = Number((totalInvestment - totalAllocated).toFixed(2));
+
+  const allocationBySector = allocations.reduce((map, item) => {
+    map[item.sector] = (map[item.sector] || 0) + item.allocated;
+    return map;
+  }, {});
+
+  const sectorExposure = Object.entries(allocationBySector).map(([sector, value]) => ({ sector, value, pct: Number(((value / totalAllocated) * 100).toFixed(1)) }));
+  const diversificationScore = Number((Math.max(0, Math.min(100, 100 - (allocations.length > 0 ? ((Math.max(...allocations.map(a => a.targetRatio)) - Math.min(...allocations.map(a => a.targetRatio))) * 0.8) : 0)))).toFixed(0));
+  const riskScore = Number((Math.min(100, Math.max(25, riskScale * 40 + (allocations.reduce((sum, a) => sum + a.volatility, 0) / allocations.length) * 3))).toFixed(0));
+  const volatilityScore = Number((Math.max(0, Math.min(100, 100 - allocations.reduce((sum, a) => sum + a.volatility, 0) / Math.max(1, allocations.length)))).toFixed(0));
+
+  const projected = {
+    best: Number((totalInvestment * 1.15).toFixed(0)),
+    expected: Number((totalInvestment * 1.06).toFixed(0)),
+    risk: Number((totalInvestment * 0.91).toFixed(0)),
+  };
+
+  const projectionRange = {
+    best: '+15%',
+    expected: '+6%',
+    risk: '-9%',
+  };
+
+  const response = {
+    amount: totalInvestment,
+    count: portfolioCount,
+    risk: riskPreference,
+    goal: investmentGoal,
+    symbols: prioritisedSymbols,
+    allocations,
+    totalAllocated,
+    remainingBalance,
+    diversificationScore,
+    riskScore,
+    volatilityScore,
+    sectorExposure,
+    totalScore: Number(totalScore.toFixed(2)),
+    projected,
+    projectionRange,
+    timestamp: Date.now(),
+  };
+  aiPortfolioCache = { key: cacheKey, ts: Date.now(), data: response };
+  res.json(response);
+});
+
+router.post('/portfolio/analyze', async (req, res) => {
+  const requested = Array.isArray(req.body.symbols)
+    ? req.body.symbols.map(String).map(s => s.trim().toUpperCase()).filter(Boolean)
+    : [];
+  const cacheKey = JSON.stringify({ symbols: requested });
+  const cacheAge = Date.now() - aiPortfolioInsightCache.ts;
+  if (cacheAge < 10000 && cacheKey === aiPortfolioInsightCache.key) {
+    return res.json({ ...aiPortfolioInsightCache.data, cached: true, timestamp: Date.now() });
+  }
+
+  try {
+    const state = getState();
+    const stocks = requested.length
+      ? requested.map(sym => state.getStock(sym)).filter(Boolean)
+      : state.getAllStocks().filter(s => s.price > 0).slice(0, 25);
+
+    if (!stocks.length) {
+      return res.status(400).json({ error: 'No valid symbols provided for analysis' });
+    }
+
+    const now = Date.now();
+    const news = getEventsInRange(now - 14 * 24 * 60 * 60 * 1000, now).slice(0, 6);
+    const insight = await generateInsight(stocks, news, { rate: null, direction: 'stable' });
+
+    const response = { symbols: stocks.map(s => s.symbol), insight, timestamp: Date.now() };
+    aiPortfolioInsightCache = { key: cacheKey, ts: Date.now(), data: response };
+    res.json(response);
+  } catch (err) {
+    logger.error({ err: err.message }, 'Portfolio analyze error');
+    res.status(500).json({ error: 'Failed to generate portfolio insight' });
+  }
+});
+
+router.use('/', authRoutes);
+router.use('/', sentimentRoutes);
+router.use('/', alertsRoutes);
+router.use('/', portfolioRoutes);
+
+router.get('/health', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   const range  = (req.query.range || '1m').toLowerCase();
   try {
@@ -322,7 +520,9 @@ router.get('/indicators/:symbol/rsi', async (req, res) => {
 router.get('/indicators/explanations', (req, res) => {
   res.json({ indicators: INDICATOR_EXPLANATIONS });
 });
+// ── AUTH / DEMO ROUTES ──────────────────────────────────────────────────
 
+router.use('', authRoutes);
 // ── ALERTS ROUTES ────────────────────────────────────────────────────
 
 router.use('', alertsRoutes);
@@ -330,7 +530,9 @@ router.use('', alertsRoutes);
 // ── PORTFOLIO ROUTES ──────────────────────────────────────────────────
 
 router.use('', portfolioRoutes);
+// ── USER DATA ROUTES ───────────────────────────────────────────────────
 
+router.use('', userRoutes);
 // ── SENTIMENT & LEARNING ROUTES ────────────────────────────────────
 
 router.use('', sentimentRoutes);

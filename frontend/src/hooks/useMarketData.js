@@ -264,6 +264,33 @@ export function useMarketData() {
     };
   }, [connect]);
 
+  useEffect(() => {
+    let pollTimer;
+    async function pollMarket() {
+      if (!mountedRef.current || state.connected) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/market`);
+        const data = await res.json();
+        if (!mountedRef.current || state.connected) return;
+        dispatch({
+          type: 'INIT',
+          stocks: data.stocks || [],
+          indices: data.indices || [],
+          marketStatus: data.marketStatus,
+          version: data.version,
+        });
+      } catch (_err) {
+        // silent retry on next interval
+      }
+    }
+
+    if (!state.connected) {
+      pollMarket();
+      pollTimer = setInterval(pollMarket, 120000);
+    }
+    return () => clearInterval(pollTimer);
+  }, [state.connected]);
+
   // Derived arrays (memoized via useMemo in consumers)
   const stocksArray  = Object.values(state.stocks);
   const indicesArray = Object.values(state.indices);

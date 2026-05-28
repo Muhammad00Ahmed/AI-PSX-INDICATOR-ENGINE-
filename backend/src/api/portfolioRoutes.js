@@ -6,17 +6,38 @@
 
 const express = require('express');
 const logger = require('../utils/logger');
+const { requireAuth } = require('./authMiddleware');
 const { getPortfolioEngine } = require('../analysis/portfolioEngine');
 const { getState } = require('../state/marketState');
+const { getUserData, savePortfolio } = require('../storage/userDataStore');
 
 const router = express.Router();
+router.use(requireAuth);
+
+function ensureUserAccess(req, res, next) {
+  if (req.user.id !== req.params.userId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+}
+
+function ensurePersistedPortfolio(userId) {
+  const persisted = getUserData(userId).portfolio;
+  const engine = getPortfolioEngine();
+  engine.setPortfolio(userId, persisted);
+  return engine;
+}
+
+function isDemoUser(userId) {
+  return typeof userId === 'string' && userId.startsWith('demo_');
+}
 
 // ── PORTFOLIO MANAGEMENT ────────────────────────────────────────────
 
-router.get('/portfolio/:userId', (req, res) => {
+router.get('/portfolio/:userId', ensureUserAccess, (req, res) => {
   try {
     const { userId } = req.params;
-    const engine = getPortfolioEngine();
+    const engine = ensurePersistedPortfolio(userId);
     const portfolio = engine.getPortfolio(userId);
 
     res.json({
@@ -31,12 +52,12 @@ router.get('/portfolio/:userId', (req, res) => {
   }
 });
 
-router.post('/portfolio/:userId/holdings', (req, res) => {
+router.post('/portfolio/:userId/holdings', ensureUserAccess, (req, res) => {
   try {
     const { userId } = req.params;
     const { symbol, quantity, buyPrice, sector, companyName } = req.body;
 
-    const engine = getPortfolioEngine();
+    const engine = ensurePersistedPortfolio(userId);
     const holding = engine.addHolding(userId, {
       symbol,
       quantity,
@@ -45,6 +66,7 @@ router.post('/portfolio/:userId/holdings', (req, res) => {
       companyName,
     });
 
+    savePortfolio(userId, engine.getPortfolio(userId));
     logger.info({ userId, symbol }, 'Holding added');
     res.status(201).json(holding);
   } catch (err) {
@@ -53,12 +75,13 @@ router.post('/portfolio/:userId/holdings', (req, res) => {
   }
 });
 
-router.put('/portfolio/:userId/holdings/:holdingId', (req, res) => {
+router.put('/portfolio/:userId/holdings/:holdingId', ensureUserAccess, (req, res) => {
   try {
     const { userId, holdingId } = req.params;
-    const engine = getPortfolioEngine();
+    const engine = ensurePersistedPortfolio(userId);
     const holding = engine.updateHolding(userId, holdingId, req.body);
 
+    savePortfolio(userId, engine.getPortfolio(userId));
     logger.info({ userId, holdingId }, 'Holding updated');
     res.json(holding);
   } catch (err) {
@@ -67,12 +90,13 @@ router.put('/portfolio/:userId/holdings/:holdingId', (req, res) => {
   }
 });
 
-router.delete('/portfolio/:userId/holdings/:holdingId', (req, res) => {
+router.delete('/portfolio/:userId/holdings/:holdingId', ensureUserAccess, (req, res) => {
   try {
     const { userId, holdingId } = req.params;
-    const engine = getPortfolioEngine();
+    const engine = ensurePersistedPortfolio(userId);
     const holding = engine.removeHolding(userId, holdingId);
 
+    savePortfolio(userId, engine.getPortfolio(userId));
     logger.info({ userId, holdingId }, 'Holding removed');
     res.json({ success: true, removed: holding });
   } catch (err) {
@@ -83,10 +107,10 @@ router.delete('/portfolio/:userId/holdings/:holdingId', (req, res) => {
 
 // ── PORTFOLIO PERFORMANCE ──────────────────────────────────────────
 
-router.get('/portfolio/:userId/performance', (req, res) => {
+router.get('/portfolio/:userId/performance', ensureUserAccess, (req, res) => {
   try {
     const { userId } = req.params;
-    const engine = getPortfolioEngine();
+    const engine = ensurePersistedPortfolio(userId);
     const state = getState();
 
     const portfolio = engine.getPortfolio(userId);
@@ -122,10 +146,10 @@ router.get('/portfolio/:userId/performance', (req, res) => {
 
 // ── SECTOR EXPOSURE ────────────────────────────────────────────────
 
-router.get('/portfolio/:userId/sectors', (req, res) => {
+router.get('/portfolio/:userId/sectors', ensureUserAccess, (req, res) => {
   try {
     const { userId } = req.params;
-    const engine = getPortfolioEngine();
+    const engine = ensurePersistedPortfolio(userId);
     const state = getState();
 
     const portfolio = engine.getPortfolio(userId);
